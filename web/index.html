@@ -1,0 +1,819 @@
+<title>Conteo de Góndola</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface-2: #f1efe8;
+    --text: #1b201d;
+    --text-muted: #616b63;
+    --border: #e3ddd0;
+    --accent: #0e6e5d;
+    --accent-strong: #0a5548;
+    --accent-contrast: #ffffff;
+    --accent-tint: #e3f1ec;
+    --warn: #92670f;
+    --warn-tint: #f7edd8;
+    --bad: #a1332a;
+    --bad-tint: #f6e3e0;
+    --good-dot: #1f9c73;
+    --warn-dot: #c98a1c;
+    --bad-dot: #c14b3f;
+    --shadow: 0 1px 2px rgba(30, 30, 20, 0.04), 0 8px 24px -12px rgba(30, 30, 20, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14181a;
+      --surface: #1c2124;
+      --surface-2: #23292c;
+      --text: #eceeec;
+      --text-muted: #9aa5a0;
+      --border: #2c3336;
+      --accent: #35c9a5;
+      --accent-strong: #4fe0bc;
+      --accent-contrast: #0b1512;
+      --accent-tint: rgba(53, 201, 165, 0.14);
+      --warn: #e0b559;
+      --warn-tint: rgba(224, 181, 89, 0.14);
+      --bad: #e2897d;
+      --bad-tint: rgba(226, 137, 125, 0.14);
+      --good-dot: #35c9a5;
+      --warn-dot: #e0b559;
+      --bad-dot: #e2897d;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14181a;
+    --surface: #1c2124;
+    --surface-2: #23292c;
+    --text: #eceeec;
+    --text-muted: #9aa5a0;
+    --border: #2c3336;
+    --accent: #35c9a5;
+    --accent-strong: #4fe0bc;
+    --accent-contrast: #0b1512;
+    --accent-tint: rgba(53, 201, 165, 0.14);
+    --warn: #e0b559;
+    --warn-tint: rgba(224, 181, 89, 0.14);
+    --bad: #e2897d;
+    --bad-tint: rgba(226, 137, 125, 0.14);
+    --good-dot: #35c9a5;
+    --warn-dot: #e0b559;
+    --bad-dot: #e2897d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 28px -14px rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding-inline: 20px;
+    padding-block: 28px 60px;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  .page { max-width: 1080px; margin: 0 auto; }
+
+  header.top { margin-bottom: 24px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 800;
+    margin: 0 0 6px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    color: var(--text-muted);
+    font-size: 15px;
+    max-width: 62ch;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 780px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin: 0 0 16px;
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    background: var(--surface-2);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .dropzone:hover, .dropzone.drag {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+  }
+  .dropzone svg { color: var(--text-muted); margin-bottom: 8px; }
+  .dropzone .dz-title { font-weight: 700; font-size: 14.5px; margin-bottom: 3px; }
+  .dropzone .dz-sub { font-size: 12.5px; color: var(--text-muted); }
+  .dropzone.disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .preview-wrap { margin-top: 14px; }
+  .preview-wrap img {
+    display: block;
+    width: 100%;
+    max-height: 320px;
+    object-fit: contain;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+  .file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .file-row button.link {
+    background: none; border: none; padding: 0;
+    color: var(--accent); font: inherit; font-weight: 600; cursor: pointer;
+  }
+
+  fieldset { border: none; padding: 0; margin: 16px 0 0; }
+  legend {
+    font-size: 12.5px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding: 0;
+  }
+  .tile-hint { font-size: 12px; color: var(--text-muted); margin: 4px 0 0; line-height: 1.4; }
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .pill[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    border: none;
+    font: inherit;
+    font-weight: 700;
+    font-size: 14.5px;
+    cursor: pointer;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    transition: background 0.15s ease, opacity 0.15s ease;
+  }
+  .btn:hover:not(:disabled) { background: var(--accent-strong); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible, .pill:focus-visible, .dropzone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .progress-line {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 18px;
+  }
+  .spinner {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+    flex: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 1.6s; } }
+
+  .banner {
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin-top: 14px;
+  }
+  .banner.warn { background: var(--warn-tint); color: var(--warn); }
+  .banner.bad { background: var(--bad-tint); color: var(--bad); }
+
+  .results-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .example-tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--warn);
+    background: var(--warn-tint);
+    padding: 4px 9px;
+    border-radius: 999px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 24px;
+    font-weight: 600;
+    display: block;
+  }
+  .stat .l {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .section-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 22px 0 10px;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+  .bar-row .name { font-size: 13.5px; font-weight: 600; }
+  .bar-row .count { font-family: "IBM Plex Mono", monospace; font-size: 13.5px; font-weight: 600; text-align: right; }
+  .bar-track {
+    grid-column: 1 / -1;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: inherit; }
+
+  table.brand-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.brand-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 700;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.brand-table td {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  table.brand-table tr:last-child td { border-bottom: none; }
+  table.brand-table td.num { font-family: "IBM Plex Mono", monospace; text-align: right; font-weight: 600; }
+  .conf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .dot.alta { background: var(--good-dot); }
+  .dot.media { background: var(--warn-dot); }
+  .dot.baja { background: var(--bad-dot); }
+
+  .foot-note {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .empty-note { font-size: 13.5px; color: var(--text-muted); line-height: 1.5; }
+  .unavailable {
+    text-align: center;
+    padding: 30px 16px;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  sr-only, .sr-only {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+</style>
+
+<div class="page">
+  <header class="top">
+    <p class="eyebrow">Shelf Analytics · Prototipo</p>
+    <h1>Conteo de productos en góndola</h1>
+    <p class="sub">Sube una foto del anaquel y el sistema identifica cada unidad de producto — categoría, marca visible y confianza — y las cuenta por ti.</p>
+  </header>
+
+  <div id="unavailableBox" hidden class="card unavailable"></div>
+
+  <div id="mainGrid" class="grid">
+    <section class="card" aria-labelledby="uploadH">
+      <h2 id="uploadH">1. Foto de la góndola</h2>
+
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Subir foto de la góndola">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto;display:block"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>
+        <div class="dz-title">Arrastra una foto o haz clic para subir</div>
+        <div class="dz-sub" id="dzSub">JPG, PNG o WEBP</div>
+      </div>
+      <input id="fileInput" type="file" accept="image/*" class="sr-only" aria-hidden="true">
+
+      <div id="previewWrap" class="preview-wrap" hidden>
+        <img id="previewImg" alt="Vista previa de la foto subida">
+        <div class="file-row">
+          <span id="fileMeta"></span>
+          <button class="link" id="changeBtn" type="button">Cambiar foto</button>
+        </div>
+      </div>
+
+      <fieldset id="tileField">
+        <legend>Dividir la foto en columnas</legend>
+        <div class="pill-row" id="tilePills" role="group" aria-label="Número de columnas para el análisis">
+          <button class="pill" type="button" data-n="1" aria-pressed="false">1</button>
+          <button class="pill" type="button" data-n="2" aria-pressed="true">2</button>
+          <button class="pill" type="button" data-n="3" aria-pressed="false">3</button>
+          <button class="pill" type="button" data-n="4" aria-pressed="false">4</button>
+        </div>
+        <p class="tile-hint">Más columnas = más precisión en góndolas muy llenas, pero más llamadas (y más tiempo) por análisis.</p>
+      </fieldset>
+
+      <button class="btn" id="analyzeBtn" type="button" disabled>Analizar foto</button>
+      <button class="btn ghost" id="stopBtn" type="button" hidden>Detener</button>
+      <div class="progress-line" id="progressLine"></div>
+      <div id="errorBanner"></div>
+    </section>
+
+    <section class="card" aria-labelledby="resultsH">
+      <div class="results-head">
+        <h2 id="resultsH" style="margin:0">2. Resultado del conteo</h2>
+        <span class="example-tag" id="exampleTag">Ejemplo</span>
+      </div>
+      <div id="resultsBody"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Example state (shown at rest, replaced by a real run) ----------
+  var EXAMPLE = {
+    isExample: true,
+    total: 76,
+    categories: [
+      ["Desodorantes en barra", 18],
+      ["Empaques de higiene dental", 10],
+      ["Cajas de pañuelos / toallitas", 18],
+      ["Shampoo / acondicionador", 8],
+      ["Cremas / lociones", 5],
+      ["Cajas varias (no identificadas)", 17]
+    ],
+    brands: [], // ejemplo: sin marca legible a esta resolución
+    unbranded: 76
+  };
+
+  var els = {
+    unavailableBox: document.getElementById("unavailableBox"),
+    mainGrid: document.getElementById("mainGrid"),
+    dropzone: document.getElementById("dropzone"),
+    dzSub: document.getElementById("dzSub"),
+    fileInput: document.getElementById("fileInput"),
+    previewWrap: document.getElementById("previewWrap"),
+    previewImg: document.getElementById("previewImg"),
+    fileMeta: document.getElementById("fileMeta"),
+    changeBtn: document.getElementById("changeBtn"),
+    tileField: document.getElementById("tileField"),
+    tilePills: document.getElementById("tilePills"),
+    analyzeBtn: document.getElementById("analyzeBtn"),
+    stopBtn: document.getElementById("stopBtn"),
+    progressLine: document.getElementById("progressLine"),
+    errorBanner: document.getElementById("errorBanner"),
+    resultsBody: document.getElementById("resultsBody"),
+    exampleTag: document.getElementById("exampleTag")
+  };
+
+  var state = {
+    sample: null,
+    limits: null,
+    file: null,
+    img: null,
+    tiles: 2,
+    controller: null,
+    running: false
+  };
+
+  function bannerHTML(kind, text) {
+    return '<div class="banner ' + kind + '">' + text + '</div>';
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return Math.round(n / 1024) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function renderResults(data) {
+    els.exampleTag.hidden = !data.isExample;
+    var html = "";
+
+    html += '<div class="stat-row">' +
+      '<div class="stat"><span class="n tabular">' + data.total + '</span><span class="l">unidades contadas</span></div>' +
+      '<div class="stat"><span class="n tabular">' + data.categories.length + '</span><span class="l">categorías</span></div>' +
+      '<div class="stat"><span class="n tabular">' + (data.total ? Math.round(100 * (data.total - data.unbranded) / data.total) : 0) + '%</span><span class="l">con marca legible</span></div>' +
+      '</div>';
+
+    html += '<div class="section-title">Unidades por categoría</div>';
+    var max = Math.max.apply(null, data.categories.map(function (c) { return c[1]; }).concat([1]));
+    html += '<div class="bar-list">';
+    data.categories.forEach(function (c) {
+      var pct = Math.max(4, Math.round((c[1] / max) * 100));
+      html += '<div class="bar-row">' +
+        '<span class="name">' + escapeHTML(c[0]) + '</span>' +
+        '<span class="count tabular">' + c[1] + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="section-title">Marca / producto identificado</div>';
+    if (data.brands.length) {
+      html += '<table class="brand-table"><thead><tr><th>Marca / variante</th><th>Confianza</th><th style="text-align:right">Unidades</th></tr></thead><tbody>';
+      data.brands.forEach(function (b) {
+        html += '<tr><td>' + escapeHTML(b.name) + '</td><td><span class="conf"><span class="dot ' + b.confidence + '"></span>' + capitalize(b.confidence) + '</span></td><td class="num tabular">' + b.count + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    } else {
+      html += '<p class="empty-note">A la resolución de esta foto no se pudo leer texto de marca con confianza — solo categorías por forma/color. Para SKU exacto hace falta comparar cada detección contra un catálogo de fotos de referencia del cliente.</p>';
+    }
+
+    if (data.unbranded > 0 && data.brands.length > 0) {
+      html += '<p class="empty-note" style="margin-top:10px">' + data.unbranded + ' unidad(es) sin marca legible en esta pasada.</p>';
+    }
+
+    html += '<div class="foot-note">Análisis hecho por Claude directamente en tu navegador (tu propio uso de IA) — la foto no se guarda en ningún servidor de este sistema. Es un conteo por lectura visual, no un escaneo de código de barras: trátalo como estimado, sobre todo en góndolas muy llenas.</div>';
+
+    els.resultsBody.innerHTML = html;
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  renderResults(EXAMPLE);
+
+  // ---------- Capability bootstrap ----------
+  function showUnavailable(msg) {
+    els.mainGrid.hidden = true;
+    els.unavailableBox.hidden = false;
+    els.unavailableBox.textContent = msg;
+  }
+
+  (async function init() {
+    if (!window.claude || typeof window.claude.use !== "function") {
+      showUnavailable("El análisis con IA no está disponible en esta vista de la página.");
+      return;
+    }
+    var sample = await window.claude.use("sample");
+    if (!sample) {
+      showUnavailable("El análisis con IA no está disponible en esta vista de la página.");
+      return;
+    }
+    state.sample = sample;
+    try {
+      state.limits = await sample.limits();
+    } catch (e) {
+      state.limits = null;
+    }
+    if (!state.limits || !state.limits.images) {
+      showUnavailable("Esta vista no admite subir imágenes para análisis. Ábrela directamente en Claude para usar esta herramienta.");
+      return;
+    }
+    if (state.limits.images.mediaTypes && state.limits.images.mediaTypes.length) {
+      els.fileInput.setAttribute("accept", state.limits.images.mediaTypes.join(","));
+      els.dzSub.textContent = "Máximo " + fmtBytes(state.limits.images.maxInputBytes) + " · " +
+        state.limits.images.mediaTypes.map(function (t) { return t.replace("image/", "").toUpperCase(); }).join(", ");
+    }
+  })();
+
+  // ---------- Upload UI ----------
+  function openPicker() { els.fileInput.click(); }
+  els.dropzone.addEventListener("click", openPicker);
+  els.dropzone.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPicker(); }
+  });
+  els.dropzone.addEventListener("dragover", function (e) { e.preventDefault(); els.dropzone.classList.add("drag"); });
+  els.dropzone.addEventListener("dragleave", function () { els.dropzone.classList.remove("drag"); });
+  els.dropzone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    els.dropzone.classList.remove("drag");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  els.fileInput.addEventListener("change", function () {
+    if (els.fileInput.files && els.fileInput.files[0]) handleFile(els.fileInput.files[0]);
+  });
+  els.changeBtn.addEventListener("click", openPicker);
+
+  function handleFile(file) {
+    if (state.limits && state.limits.images && file.size > state.limits.images.maxInputBytes) {
+      setError('bad', "Ese archivo pesa " + fmtBytes(file.size) + "; el máximo aceptado aquí es " + fmtBytes(state.limits.images.maxInputBytes) + ".");
+      return;
+    }
+    setError("");
+    state.file = file;
+    var url = URL.createObjectURL(file);
+    var im = new Image();
+    im.onload = function () {
+      state.img = im;
+      els.previewImg.src = url;
+      els.previewWrap.hidden = false;
+      els.fileMeta.textContent = file.name + " · " + fmtBytes(file.size);
+      els.analyzeBtn.disabled = false;
+    };
+    im.src = url;
+  }
+
+  els.tilePills.addEventListener("click", function (e) {
+    var btn = e.target.closest(".pill");
+    if (!btn) return;
+    state.tiles = parseInt(btn.dataset.n, 10);
+    Array.prototype.forEach.call(els.tilePills.querySelectorAll(".pill"), function (p) {
+      p.setAttribute("aria-pressed", p === btn ? "true" : "false");
+    });
+  });
+
+  function setError(kind, text) {
+    els.errorBanner.innerHTML = kind ? bannerHTML(kind, text) : "";
+  }
+  function setProgress(text, spin) {
+    els.progressLine.innerHTML = text ? (spin ? '<span class="spinner" aria-hidden="true"></span>' : "") + '<span>' + escapeHTML(text) + '</span>' : "";
+  }
+
+  // ---------- Tiling ----------
+  function sliceIntoTiles(img, n) {
+    var w = img.naturalWidth, h = img.naturalHeight;
+    var tileW = Math.floor(w / n);
+    var blobs = [];
+    var promises = [];
+    for (var i = 0; i < n; i++) {
+      var left = i * tileW;
+      var right = (i === n - 1) ? w : (i + 1) * tileW;
+      var cw = right - left;
+      var canvas = document.createElement("canvas");
+      canvas.width = cw;
+      canvas.height = h;
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, left, 0, cw, h, 0, 0, cw, h);
+      promises.push(new Promise(function (resolve, canvasRef) {
+        canvasRef.toBlob(function (blob) { resolve(blob); }, "image/jpeg", 0.92);
+      }.bind(null, canvas)));
+    }
+    return Promise.all(promises);
+  }
+
+  // ---------- Prompt ----------
+  function promptFor(i, n) {
+    var frame = n > 1
+      ? "Estás viendo un recorte (columna " + (i + 1) + " de " + n + ") de una foto de un anaquel/góndola de tienda."
+      : "Estás viendo una foto de un anaquel/góndola de tienda.";
+    return frame + "\n\n" +
+      'Tu tarea: listar CADA unidad de producto individual visible en esta imagen (cada "facing"), no solo los tipos de producto. Cuenta unidades repetidas del mismo producto como entradas separadas. No cuentes un producto que aparezca cortado por el borde en menos de la mitad de su tamaño (para evitar contarlo dos veces entre columnas vecinas).\n\n' +
+      'Para cada unidad visible, reporta:\n' +
+      '- "category": categoría general en español (ej. "shampoo", "desodorante", "pasta dental", "papel higiénico", "toallas húmedas")\n' +
+      '- "brand_guess": marca o nombre de producto SI el texto del empaque es legible con confianza razonable; si no, null\n' +
+      '- "variant_guess": tamaño/variante si es legible (ej. "400ml"); si no, null\n' +
+      '- "confidence": "alta" | "media" | "baja" — qué tan seguro estás de la identificación de marca/variante (el conteo de la unidad puede ser confiable aunque la marca sea "baja")\n' +
+      '- "color_pattern": color o patrón dominante del empaque, en pocas palabras\n\n' +
+      'Responde SOLO con este JSON, sin texto antes ni después:\n' +
+      '{"items": [{"category": "...", "brand_guess": null, "variant_guess": null, "confidence": "...", "color_pattern": "..."}]}';
+  }
+
+  // ---------- Aggregation ----------
+  function aggregate(items) {
+    var byCat = {}, catOrder = [];
+    var byBrand = {}, brandOrder = [];
+    var unbranded = 0;
+    items.forEach(function (it) {
+      var cat = (it && it.category) ? String(it.category) : "sin categoría";
+      if (!(cat in byCat)) { byCat[cat] = 0; catOrder.push(cat); }
+      byCat[cat]++;
+
+      var brand = it && it.brand_guess ? String(it.brand_guess).trim() : "";
+      if (brand) {
+        var variant = it && it.variant_guess ? String(it.variant_guess).trim() : "";
+        var key = (brand + (variant ? " " + variant : "")).trim();
+        if (!(key in byBrand)) {
+          byBrand[key] = { count: 0, confidence: (it.confidence || "media") };
+          brandOrder.push(key);
+        }
+        byBrand[key].count++;
+      } else {
+        unbranded++;
+      }
+    });
+    var categories = catOrder.map(function (c) { return [c, byCat[c]]; }).sort(function (a, b) { return b[1] - a[1]; });
+    var brands = brandOrder.map(function (k) { return { name: k, count: byBrand[k].count, confidence: normConf(byBrand[k].confidence) }; })
+      .sort(function (a, b) { return b.count - a.count; });
+    return {
+      isExample: false,
+      total: items.length,
+      categories: categories.length ? categories : [["sin datos", 0]],
+      brands: brands,
+      unbranded: unbranded
+    };
+  }
+  function normConf(c) {
+    c = String(c || "").toLowerCase();
+    if (c.indexOf("alt") === 0 || c === "high") return "alta";
+    if (c.indexOf("baj") === 0 || c === "low") return "baja";
+    return "media";
+  }
+
+  // ---------- Error copy ----------
+  function copyForError(code) {
+    switch (code) {
+      case "not_granted":
+      case "sampling_disabled":
+        return { kind: "bad", text: "El análisis con IA no está habilitado para tu cuenta en esta vista." };
+      case "images_unavailable":
+        return { kind: "bad", text: "Esta vista no admite enviar imágenes a Claude." };
+      case "image_rejected":
+        return { kind: "bad", text: "La imagen no pudo procesarse (tipo de archivo o tamaño no admitido). Prueba con otra foto." };
+      case "rate_limited":
+        return { kind: "warn", text: "Demasiadas solicitudes por ahora. Espera un momento y vuelve a intentar." };
+      case "cancelled":
+        return { kind: "warn", text: "Análisis detenido." };
+      case "refused":
+        return { kind: "warn", text: "Claude no pudo procesar esa imagen. Intenta con otra foto." };
+      case "empty_completion":
+      case "invalid_json":
+        return { kind: "warn", text: "No se pudo interpretar la respuesta para esta columna. Intenta de nuevo o usa menos columnas." };
+      default:
+        return { kind: "warn", text: "Hubo un problema de conexión analizando la foto. Intenta de nuevo." };
+    }
+  }
+
+  // ---------- Run ----------
+  els.stopBtn.addEventListener("click", function () {
+    if (state.controller) state.controller.abort();
+  });
+
+  els.analyzeBtn.addEventListener("click", function () {
+    if (!state.img || !state.sample || state.running) return;
+    runAnalysis();
+  });
+
+  async function runAnalysis() {
+    state.running = true;
+    setError("");
+    els.analyzeBtn.disabled = true;
+    els.analyzeBtn.hidden = true;
+    els.stopBtn.hidden = false;
+    var n = state.tiles;
+    setProgress("Dividiendo la foto…", true);
+
+    var controller = new AbortController();
+    state.controller = controller;
+
+    try {
+      var blobs = await sliceIntoTiles(state.img, n);
+      var allItems = [];
+      var hadFailure = false;
+
+      for (var i = 0; i < blobs.length; i++) {
+        setProgress("Analizando columna " + (i + 1) + " de " + n + "…", true);
+        try {
+          var result = await state.sample.json(promptFor(i, n), {
+            images: [blobs[i]],
+            modelTier: "default",
+            cache: false,
+            signal: controller.signal
+          });
+          if (result && Array.isArray(result.items)) {
+            allItems = allItems.concat(result.items);
+          } else {
+            hadFailure = true;
+          }
+        } catch (err) {
+          if (err && err.code === "cancelled") throw err;
+          hadFailure = true;
+          var c = copyForError(err && err.code);
+          setError(c.kind, "Columna " + (i + 1) + ": " + c.text);
+          if (err && (err.code === "not_granted" || err.code === "sampling_disabled" || err.code === "images_unavailable")) {
+            throw err;
+          }
+        }
+      }
+
+      if (allItems.length === 0) {
+        setError("bad", "No se detectaron productos. Prueba con una foto más clara o con menos columnas.");
+      } else {
+        renderResults(aggregate(allItems));
+        if (hadFailure) {
+          setError("warn", "Algunas columnas no se pudieron analizar — el conteo de abajo es parcial.");
+        }
+      }
+      setProgress("");
+    } catch (err) {
+      if (err && err.code === "cancelled") {
+        setProgress("");
+        setError("warn", copyForError("cancelled").text);
+      } else {
+        setProgress("");
+        var c2 = copyForError(err && err.code);
+        setError(c2.kind, c2.text);
+      }
+    } finally {
+      state.running = false;
+      state.controller = null;
+      els.analyzeBtn.disabled = false;
+      els.analyzeBtn.hidden = false;
+      els.stopBtn.hidden = true;
+    }
+  }
+})();
+</script>
