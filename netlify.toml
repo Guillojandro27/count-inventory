@@ -1,0 +1,6 @@
+[build]
+  publish = "web"
+
+# Sin build command: web/index.html es HTML estático, no necesita compilarse.
+# netlify/functions/analyze.mjs se detecta y despliega automáticamente por
+# estar en la carpeta por defecto — no hace falta configurarlo aparte.

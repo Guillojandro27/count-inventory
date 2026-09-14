@@ -28,9 +28,11 @@ Herramienta de shelf/planogram analytics: sube una foto de una góndola y el sis
   - Dentro de un artifact de Claude: usa `window.claude.use("sample")` (uso de IA del propio usuario, sin backend).
   - Fuera de Claude (ej. desplegada en un sitio propio): usa `POST /api/analyze` como respaldo.
 
-- **`functions/api/analyze.js`** — función de backend (Cloudflare Pages Functions) que recibe la foto, llama a la API de Anthropic con una API key del servidor, y le devuelve el JSON a `web/index.html`. Necesaria porque `window.claude` no existe fuera del visor de artifacts de Claude.
+- **`functions/api/analyze.js`** — función de backend para **Cloudflare Pages**. Recibe `{image, mediaType, prompt}` en JSON, llama a la API de Anthropic con una API key del servidor, y le devuelve el JSON a `web/index.html`. Necesaria porque `window.claude` no existe fuera del visor de artifacts de Claude.
+- **`netlify/functions/analyze.mjs`** — la misma función, escrita para **Netlify Functions**. Misma lógica, misma ruta pública (`/api/analyze`, vía `config.path`), pero con el aviso de timeout de la siguiente sección.
+- **`netlify.toml`** — fija el Publish directory (`web`) en el repo, para que no dependa de la configuración manual del dashboard.
 
-## Despliegue en Cloudflare Pages
+## Despliegue en Cloudflare Pages (recomendado)
 
 Por qué Cloudflare y no Netlify/Vercel: una llamada de Claude con visión tarda 5–60s, y en Cloudflare Workers el tiempo de espera de un `fetch()` a una API externa **no cuenta** contra el límite de CPU del plan gratis (10ms) — solo se mide cómputo real. Netlify/Vercel cortan funciones síncronas a los 10s en su plan gratis, sin importar en qué se fue el tiempo.
 
@@ -44,6 +46,18 @@ Por qué Cloudflare y no Netlify/Vercel: una llamada de Claude con visión tarda
    - `CLAUDE_MODEL` (opcional) — si no se define, usa el default en `analyze.js`
    - `ANALYZE_TOKEN` (opcional) — traba simple contra abuso; si la defines aquí, pon el mismo valor en `BACKEND_TOKEN` dentro de `web/index.html` antes de desplegar (esto NO es autenticación real, cualquiera que vea el código fuente lo ve — para algo serio, usar Cloudflare Access)
 4. Deploy. `functions/` se despliega automático junto con `web/` — no hace falta configurarlo aparte.
+
+## Despliegue en Netlify (alternativa — con una limitación real)
+
+1. En el dashboard del sitio: **Project configuration → Build & deploy → Publish directory** → `web` (o simplemente deja que `netlify.toml` lo haga, ya viene en el repo).
+2. **Project configuration → Environment variables → Add a variable**:
+   - `ANTHROPIC_API_KEY` — tu key de `console.anthropic.com` (API Keys → Create Key)
+   - `CLAUDE_MODEL` (opcional)
+   - `ANALYZE_TOKEN` (opcional, mismo aviso que arriba)
+3. Vuelve a desplegar (**Deploys → ⋯ → Retry deployment**, o un `git push` nuevo) — las variables de entorno solo aplican a despliegues hechos después de configurarlas.
+4. `netlify/functions/analyze.mjs` se detecta y publica solo, en `/api/analyze` (por el `config.path` del archivo) — no hace falta ninguna regla de redirect.
+
+**Limitación a tener presente:** las funciones síncronas de Netlify se cortan a los 10 segundos en el plan gratis, y una sola llamada de Claude con visión típicamente tarda más que eso. Es probable que el análisis falle de forma intermitente — más seguido con fotos grandes o con 3-4 columnas. Si pasa: prueba con **1 sola columna** (llamada más simple y rápida), o considera Cloudflare Pages, que no tiene este límite.
 
 ## Estado
 
