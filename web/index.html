@@ -613,14 +613,17 @@
         signal: signal
       });
     }
-    var form = new FormData();
-    form.append("image", blob, "tile.jpg");
-    form.append("prompt", prompt);
-    var headers = {};
+    var imageBase64 = await blobToBase64(blob);
+    var headers = { "content-type": "application/json" };
     if (BACKEND_TOKEN) headers["X-Analyze-Token"] = BACKEND_TOKEN;
     var resp;
     try {
-      resp = await fetch("/api/analyze", { method: "POST", body: form, headers: headers, signal: signal });
+      resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ image: imageBase64, mediaType: blob.type || "image/jpeg", prompt: prompt }),
+        signal: signal
+      });
     } catch (e) {
       if (signal && signal.aborted) throw { code: "cancelled" };
       throw { code: "upstream_error", message: String(e) };
@@ -631,6 +634,18 @@
       throw { code: code === "unauthorized" ? "backend_unauthorized" : code, message: (body && body.message) || ("HTTP " + resp.status) };
     }
     return body;
+  }
+
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var result = reader.result; // "data:image/jpeg;base64,AAAA..."
+        resolve(result.slice(result.indexOf(",") + 1));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   // ---------- Upload UI ----------
