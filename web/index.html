@@ -474,7 +474,15 @@
     exampleTag: document.getElementById("exampleTag")
   };
 
+  // Cuando esta página corre fuera del visor de artifacts de Claude (ej.
+  // desplegada en Cloudflare Pages), no existe window.claude — en ese caso
+  // usamos /api/analyze (functions/api/analyze.js) como respaldo. Si ese
+  // endpoint está protegido con ANALYZE_TOKEN, pon aquí el mismo valor
+  // (esto NO es seguridad real: cualquiera que vea el código fuente lo ve).
+  var BACKEND_TOKEN = "";
+
   var state = {
+    mode: null, // "sample" | "backend"
     sample: null,
     limits: null,
     file: null,
@@ -532,7 +540,10 @@
       html += '<p class="empty-note" style="margin-top:10px">' + data.unbranded + ' unidad(es) sin marca legible en esta pasada.</p>';
     }
 
-    html += '<div class="foot-note">Análisis hecho por Claude directamente en tu navegador (tu propio uso de IA) — la foto no se guarda en ningún servidor de este sistema. Es un conteo por lectura visual, no un escaneo de código de barras: trátalo como estimado, sobre todo en góndolas muy llenas.</div>';
+    var howText = state.mode === "sample"
+      ? "Análisis hecho por Claude directamente en tu navegador (tu propio uso de IA) — la foto no se guarda en ningún servidor de este sistema."
+      : "Análisis hecho por Claude a través de la función de este sitio — la foto se manda a la API de Anthropic para analizarla y no se guarda.";
+    html += '<div class="foot-note">' + howText + ' Es un conteo por lectura visual, no un escaneo de código de barras: trátalo como estimado, sobre todo en góndolas muy llenas.</div>';
 
     els.resultsBody.innerHTML = html;
   }
@@ -553,32 +564,74 @@
     els.unavailableBox.textContent = msg;
   }
 
+  var BACKEND_LIMITS = {
+    images: { maxCount: 1, maxInputBytes: 10 * 1024 * 1024, mediaTypes: ["image/jpeg", "image/png", "image/webp"] }
+  };
+
   (async function init() {
-    if (!window.claude || typeof window.claude.use !== "function") {
-      showUnavailable("El análisis con IA no está disponible en esta vista de la página.");
-      return;
+    // 1) Dentro de un artifact de Claude: usar la capacidad "sample".
+    if (window.claude && typeof window.claude.use === "function") {
+      var sample = await window.claude.use("sample");
+      if (sample) {
+        state.mode = "sample";
+        state.sample = sample;
+        try {
+          state.limits = await sample.limits();
+        } catch (e) {
+          state.limits = null;
+        }
+        if (!state.limits || !state.limits.images) {
+          showUnavailable("Esta vista no admite subir imágenes para análisis. Ábrela directamente en Claude para usar esta herramienta.");
+          return;
+        }
+        applyLimitsToUI(state.limits);
+        return;
+      }
     }
-    var sample = await window.claude.use("sample");
-    if (!sample) {
-      showUnavailable("El análisis con IA no está disponible en esta vista de la página.");
-      return;
-    }
-    state.sample = sample;
-    try {
-      state.limits = await sample.limits();
-    } catch (e) {
-      state.limits = null;
-    }
-    if (!state.limits || !state.limits.images) {
-      showUnavailable("Esta vista no admite subir imágenes para análisis. Ábrela directamente en Claude para usar esta herramienta.");
-      return;
-    }
-    if (state.limits.images.mediaTypes && state.limits.images.mediaTypes.length) {
-      els.fileInput.setAttribute("accept", state.limits.images.mediaTypes.join(","));
-      els.dzSub.textContent = "Máximo " + fmtBytes(state.limits.images.maxInputBytes) + " · " +
-        state.limits.images.mediaTypes.map(function (t) { return t.replace("image/", "").toUpperCase(); }).join(", ");
-    }
+    // 2) Fuera de Claude (ej. Cloudflare Pages): usar /api/analyze.
+    state.mode = "backend";
+    state.limits = BACKEND_LIMITS;
+    applyLimitsToUI(state.limits);
   })();
+
+  function applyLimitsToUI(limits) {
+    if (limits.images.mediaTypes && limits.images.mediaTypes.length) {
+      els.fileInput.setAttribute("accept", limits.images.mediaTypes.join(","));
+      els.dzSub.textContent = "Máximo " + fmtBytes(limits.images.maxInputBytes) + " · " +
+        limits.images.mediaTypes.map(function (t) { return t.replace("image/", "").toUpperCase(); }).join(", ");
+    }
+  }
+
+  // Una sola llamada de análisis, sin importar el modo. Devuelve {items:[...]}
+  // o lanza {code, message} en el mismo formato que usa copyForError().
+  async function callAnalyze(blob, prompt, signal) {
+    if (state.mode === "sample") {
+      return state.sample.json(prompt, {
+        images: [blob],
+        modelTier: "default",
+        cache: false,
+        signal: signal
+      });
+    }
+    var form = new FormData();
+    form.append("image", blob, "tile.jpg");
+    form.append("prompt", prompt);
+    var headers = {};
+    if (BACKEND_TOKEN) headers["X-Analyze-Token"] = BACKEND_TOKEN;
+    var resp;
+    try {
+      resp = await fetch("/api/analyze", { method: "POST", body: form, headers: headers, signal: signal });
+    } catch (e) {
+      if (signal && signal.aborted) throw { code: "cancelled" };
+      throw { code: "upstream_error", message: String(e) };
+    }
+    var body = await resp.json().catch(function () { return null; });
+    if (!resp.ok) {
+      var code = (body && body.error) || "upstream_error";
+      throw { code: code === "unauthorized" ? "backend_unauthorized" : code, message: (body && body.message) || ("HTTP " + resp.status) };
+    }
+    return body;
+  }
 
   // ---------- Upload UI ----------
   function openPicker() { els.fileInput.click(); }
@@ -732,6 +785,12 @@
       case "empty_completion":
       case "invalid_json":
         return { kind: "warn", text: "No se pudo interpretar la respuesta para esta columna. Intenta de nuevo o usa menos columnas." };
+      case "backend_unauthorized":
+        return { kind: "bad", text: "Este sitio requiere autorización para analizar fotos (revisa BACKEND_TOKEN)." };
+      case "server_misconfigured":
+        return { kind: "bad", text: "Falta configurar la API key de Anthropic en el servidor." };
+      case "image_too_large":
+        return { kind: "bad", text: "Esa imagen pesa demasiado. Prueba con una foto más liviana." };
       default:
         return { kind: "warn", text: "Hubo un problema de conexión analizando la foto. Intenta de nuevo." };
     }
@@ -743,7 +802,7 @@
   });
 
   els.analyzeBtn.addEventListener("click", function () {
-    if (!state.img || !state.sample || state.running) return;
+    if (!state.img || !state.mode || state.running) return;
     runAnalysis();
   });
 
@@ -767,12 +826,7 @@
       for (var i = 0; i < blobs.length; i++) {
         setProgress("Analizando columna " + (i + 1) + " de " + n + "…", true);
         try {
-          var result = await state.sample.json(promptFor(i, n), {
-            images: [blobs[i]],
-            modelTier: "default",
-            cache: false,
-            signal: controller.signal
-          });
+          var result = await callAnalyze(blobs[i], promptFor(i, n), controller.signal);
           if (result && Array.isArray(result.items)) {
             allItems = allItems.concat(result.items);
           } else {
@@ -783,7 +837,8 @@
           hadFailure = true;
           var c = copyForError(err && err.code);
           setError(c.kind, "Columna " + (i + 1) + ": " + c.text);
-          if (err && (err.code === "not_granted" || err.code === "sampling_disabled" || err.code === "images_unavailable")) {
+          if (err && (err.code === "not_granted" || err.code === "sampling_disabled" || err.code === "images_unavailable" ||
+              err.code === "backend_unauthorized" || err.code === "server_misconfigured")) {
             throw err;
           }
         }
