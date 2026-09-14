@@ -24,8 +24,27 @@ Herramienta de shelf/planogram analytics: sube una foto de una góndola y el sis
 
   Para producción sobre AWS, reemplazar la llamada a la API de Anthropic por Bedrock (`bedrock-runtime invoke_model`) dentro de `call_vision_model()` — el prompt y el schema de salida no cambian.
 
-- **`web/index.html`** — interfaz de subir-foto-y-analizar, publicada como Claude Artifact. Corre la etapa 1 directamente en el navegador (usa el uso de IA del propio usuario vía `window.claude.use("sample")`, sin backend ni API key), con el mismo enfoque de dividir la foto en columnas para góndolas densas.
+- **`web/index.html`** — interfaz de subir-foto-y-analizar. Detecta en qué contexto corre:
+  - Dentro de un artifact de Claude: usa `window.claude.use("sample")` (uso de IA del propio usuario, sin backend).
+  - Fuera de Claude (ej. desplegada en un sitio propio): usa `POST /api/analyze` como respaldo.
+
+- **`functions/api/analyze.js`** — función de backend (Cloudflare Pages Functions) que recibe la foto, llama a la API de Anthropic con una API key del servidor, y le devuelve el JSON a `web/index.html`. Necesaria porque `window.claude` no existe fuera del visor de artifacts de Claude.
+
+## Despliegue en Cloudflare Pages
+
+Por qué Cloudflare y no Netlify/Vercel: una llamada de Claude con visión tarda 5–60s, y en Cloudflare Workers el tiempo de espera de un `fetch()` a una API externa **no cuenta** contra el límite de CPU del plan gratis (10ms) — solo se mide cómputo real. Netlify/Vercel cortan funciones síncronas a los 10s en su plan gratis, sin importar en qué se fue el tiempo.
+
+1. `dash.cloudflare.com` → **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → selecciona este repo.
+2. Build settings:
+   - **Framework preset:** None
+   - **Build command:** (vacío)
+   - **Build output directory:** `web`
+3. **Settings → Environment variables** (en Production y Preview):
+   - `ANTHROPIC_API_KEY` — marcar como **Secret**
+   - `CLAUDE_MODEL` (opcional) — si no se define, usa el default en `analyze.js`
+   - `ANALYZE_TOKEN` (opcional) — traba simple contra abuso; si la defines aquí, pon el mismo valor en `BACKEND_TOKEN` dentro de `web/index.html` antes de desplegar (esto NO es autenticación real, cualquiera que vea el código fuente lo ve — para algo serio, usar Cloudflare Access)
+4. Deploy. `functions/` se despliega automático junto con `web/` — no hace falta configurarlo aparte.
 
 ## Estado
 
-Prototipo para validar el enfoque antes de decidir arquitectura de producción (integración con RetailIQ/ALLEC, catálogo de referencia para SKU exacto, pipeline en AWS).
+Prototipo para validar el enfoque antes de decidir arquitectura de producción (integración con RetailIQ/ALLEC, catálogo de referencia para SKU exacto, pipeline en AWS si aplica).
